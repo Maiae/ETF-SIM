@@ -1,2 +1,3 @@
-# ETF-SIM
-A Single Index Model shiny app for Australian ETFs
+# [ETF-SIM](https://emaia.shinyapps.io/ETF-SIM/)
+A Single Index Model Shiny App for Australian ETFs
+
