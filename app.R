@@ -34,9 +34,9 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                                     10000, min = 1000, max = 1000000),
                                        tags$div(HTML("<center>"), actionButton("do", "Run Model")),
                                        menuItem(h4("ETF List"), tabName = "etfList"),
-                                       menuItem(h4("Fork on Github"), href = "http://www.github.com", newtab = TRUE),
+                                       menuItem(h4("Fork on Github"), href = "https://github.com/Maiae/ETF-SIM", newtab = TRUE),
                                        menuItem(h4("About the SIM"), href = "https://en.wikipedia.org/wiki/Single-index_model", newtab = TRUE),
-                                       tags$footer(tags$a(href = "http://www.thedatagame.com.au", target="_blank", HTML("<br><center>"), "© The Data Game"))
+                                       tags$footer(tags$a(href = "http://www.thedatagame.com.au", target = "_blank", HTML("<br><center>"), "© The Data Game"))
                                        )
                                      ),
                                      
@@ -48,8 +48,8 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                           box(width = 6, status = "primary", title = "Optimal Portfolio & ETFs Plot", highchartOutput("portPlot"))
                           ),
                         fluidRow(
-                          box(width = 6, status = "primary", title = "Optimal Portfolio Allocation", DT::dataTableOutput("table"), height = 450),
-                          box(width = 6, status = "primary", title = "Optimal Portfolio Weights", highchartOutput("pie"), height = 450)
+                          box(width = 6, status = "primary", title = "Optimal Portfolio Allocation", DT::dataTableOutput("table"), height = 420),
+                          box(width = 6, status = "primary", title = "Optimal Portfolio Weights", highchartOutput("pie"), height = 420)
                           )
                       ),
                       tabItem("etfList", DT::dataTableOutput("etfTable"))
@@ -95,7 +95,7 @@ server <- function(input, output) {
     return(hchart(etfData, "scatter", x = StdDev, y = `Expected Returns`, group = Name, size = 1) %>%
              hc_yAxis(labels = list(format = "{value}%")) %>%
              hc_xAxis(labels = list(format = "{value}%")) %>%
-             hc_tooltip(pointFormat = "Risk: {point.x}% <br> Expected Returns: {point.y}%")
+             hc_tooltip(pointFormat = "Risk: {point.x}% <br> Expected Return: {point.y}%")
           )
   })
   
@@ -105,7 +105,7 @@ server <- function(input, output) {
     portfolioWeights <- data.frame(optSim$X)
     return(highchart() %>%
               hc_add_series_labels_values(row.names(portfolioWeights), (portfolioWeights$optSim.X * 100),
-                                          type = "pie", size = 200,
+                                          type = "pie", size = 230,
                                           dataLabels = list(enabled = TRUE)) %>% 
               hc_legend(enabled = TRUE) %>% 
               hc_tooltip(valueDecimals = 2, pointFormat = "<b>{point.y}%</b>")
@@ -125,7 +125,7 @@ server <- function(input, output) {
     return(datatable(portfolioAlloc, rownames = FALSE, selection = "none",
                      options = list(dom = 't', scrollX = TRUE)) %>% 
                      formatCurrency("Value", '$') %>% 
-                     formatPercentage("Weight", 2)
+                     formatPercentage("Weight", 1)
           )
   })
   
