@@ -45,7 +45,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                         tabItem(tabName = "dashboard",
                         fluidRow(
                           box(width = 6, status = "primary", title = "ETF Cumulative Returns", plotOutput("returnsPlot")),
-                          box(width = 6, status = "primary", title = "Optimal Portfolio & ETFs Plot", highchartOutput("portPlot"))
+                          box(width = 6, status = "primary", title = "Return and Volatility Plot", highchartOutput("portPlot"))
                           ),
                         fluidRow(
                           box(width = 6, status = "primary", title = "Optimal Portfolio Allocation", DT::dataTableOutput("table"), height = 420),
@@ -95,7 +95,7 @@ server <- function(input, output) {
     return(hchart(etfData, "scatter", x = StdDev, y = `Expected Returns`, group = Name, size = 1) %>%
              hc_yAxis(labels = list(format = "{value}%")) %>%
              hc_xAxis(labels = list(format = "{value}%")) %>%
-             hc_tooltip(pointFormat = "Risk: {point.x}% <br> Expected Return: {point.y}%")
+             hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%")
           )
   })
   
