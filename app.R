@@ -122,16 +122,16 @@ server <- function(input, output) {
                                        optSim$X,
                                        optSim$X * portfolioValue())
     names(portfolioAlloc) <- c("ASX code", "ETF name", "Weight", "Value") 
-    return(datatable(portfolioAlloc, rownames = FALSE, selection = "none",
-                     options = list(dom = 't', scrollX = TRUE)) %>% 
+    return(datatable(portfolioAlloc, rownames = FALSE, selection = "none", extensions = "Buttons",
+                     options = list(dom = 'tB', buttons = c('copy', 'csv', 'excel'), scrollX = TRUE)) %>% 
                      formatCurrency("Value", '$') %>% 
                      formatPercentage("Weight", 1)
           )
   })
   
   output$etfTable <- DT::renderDataTable({
-    datatable(etfList, selection = "none", options = list(scrollX = TRUE, scrollY = TRUE, pageLength = 25), 
-              caption = 'List of Australian Exchange-Traded Funds (ETFs) traded in the ASX.')
+  	datatable(etfList, selection = "none", options = list(scrollX = TRUE, scrollY = TRUE, pageLength = 25), 
+  						caption = 'List of Australian Exchange-Traded Funds (ETFs) traded in the ASX.')
     })
   }
 
