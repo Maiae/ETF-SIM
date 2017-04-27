@@ -7,6 +7,11 @@ library(DT)
 
 #### Load Data ####
 load("data/etf_data.rda", envir = .GlobalEnv)
+load("data/nasdaq_data.rda", envir = .GlobalEnv)
+
+### Load getReturns function ###
+# and use it instead of stockPortfolio::getReturns
+source("functions/getReturns.R")
 
 #### UI ####
 ui <- dashboardPage(title = "ETF Single Index Model",
@@ -16,9 +21,10 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                      sidebarMenu(
                                        menuItem(h4("Dashboard"), tabName = "dashboard"),
                                        selectizeInput("etfs", label = "Select ETFs",
-                                                   choices = unique(etfList$ASX_CODE), multiple = TRUE,
+                                                   choices = c(unique(etfList$ASX_CODE), unique(nasdaqList$Symbol)),
+                                                   						multiple = TRUE,
                                                    options = list(maxItems = 6,
-                                                                  placeholder = 'Select up to 6 ETFs')),
+                                                                  placeholder = 'Select up to 6 Securities')),
                                        dateRangeInput('dateRange',
                                                       label = "Select date range",
                                                       start = Sys.Date() - 1 - lubridate::years(3), 
@@ -64,7 +70,7 @@ server <- function(input, output) {
   # reactive ETF returns table
   etfReturns <- eventReactive(input$do, {
     withProgress(message = "Downloading returns data...", value = 0, {
-    returns <- getReturns(ticker = c("^AXJO", sort(input$etfs)), freq = input$frequency,
+    returns <- getReturns2(ticker = c("^AXJO", sort(input$etfs)), freq = input$frequency,
                start = input$dateRange[1], end = input$dateRange[2])
     return(returns$R)
     })
@@ -87,12 +93,12 @@ server <- function(input, output) {
   # Returns and risk plot
   output$portPlot <- renderHighchart({
     optSim <- sim()
-    etfData <- t(cbind.data.frame(rbind(round(mean.geometric(etfReturns()), 4), 
-                                        round(StdDev(etfReturns()), 4)),
-                                        "Optimal Portfolio" = rbind(round(optSim$R, 4), round(optSim$risk, 4))))
+    etfData <- t(cbind.data.frame(rbind(round(mean.geometric(etfReturns()), 5), 
+                                        round(StdDev(etfReturns()), 5)),
+                                        "Optimal Portfolio" = rbind(round(optSim$R, 5), round(optSim$risk, 5))))
     etfData <- cbind.data.frame(Name = row.names(etfData), etfData * 100)
     names(etfData) <- c("Name","Expected Returns","StdDev")
-    return(hchart(etfData, "scatter", x = StdDev, y = `Expected Returns`, group = Name, size = 1) %>%
+    return(hchart(etfData, "scatter", hcaes(x = StdDev, y = `Expected Returns`, group = Name, size = 1)) %>%
              hc_yAxis(labels = list(format = "{value}%")) %>%
              hc_xAxis(labels = list(format = "{value}%")) %>%
              hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%")
