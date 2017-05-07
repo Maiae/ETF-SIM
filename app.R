@@ -7,7 +7,7 @@ library(DT)
 
 #### Load Data ####
 load("data/etf_data.rda", envir = .GlobalEnv)
-load("data/nasdaq_data.rda", envir = .GlobalEnv)
+# load("data/nasdaq_data.rda", envir = .GlobalEnv) do not load NASDAQ stocks
 
 ### Load getReturns function ###
 # and use it instead of stockPortfolio::getReturns
@@ -21,7 +21,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                      sidebarMenu(
                                        menuItem(h4("Dashboard"), tabName = "dashboard"),
                                        selectizeInput("etfs", label = "Select ETFs",
-                                                   choices = c(unique(etfList$ASX_CODE), unique(nasdaqList$Symbol)),
+                                                   choices = unique(etfList$ASX_CODE),
                                                    						multiple = TRUE,
                                                    options = list(maxItems = 6,
                                                                   placeholder = 'Select up to 6 Securities')),
