@@ -1,9 +1,11 @@
 library(shiny)
 library(shinydashboard)
+library(tidyquant)
 library(stockPortfolio)
 library(PerformanceAnalytics)
 library(highcharter)
 library(DT)
+options(scipen=999)  # turn off scientific notation
 
 #### Load Data ####
 load("data/etf_data.rda", envir = .GlobalEnv)
@@ -27,13 +29,13 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                                                   placeholder = 'Select up to 6 Securities')),
                                        dateRangeInput('dateRange',
                                                       label = "Select date range",
-                                                      start = Sys.Date() - 1 - lubridate::years(3), 
+                                                      start = Sys.Date() - 1 - lubridate::years(1), 
                                                       end = Sys.Date() - 1,
                                                       format = "dd/mm/yyyy", weekstart = 1,
                                                       min = "2010-01-04", max = Sys.Date() - 1),
                                        radioButtons("frequency", label = "Select frequency of returns",
-                                                    choices = list("Daily" = "day",
-                                                                   "Weekly" = "week"), selected = "week"),
+                                                    choices = list("Daily" = "daily",
+                                                                   "Weekly" = "weekly"), selected = "weekly"),
                                        numericInput("riskFree", "Risk free rate (Australia Bond 10-Year Yield rate)",
                                                     0.0283, min = 0.0100, max = 0.1000),
                                        numericInput("portfolioValue", "Enter Portfolio Value ($)",
@@ -50,7 +52,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                       tabItems(
                         tabItem(tabName = "dashboard",
                         fluidRow(
-                          box(width = 6, status = "primary", title = "ETF Cumulative Returns", plotOutput("returnsPlot")),
+                          box(width = 6, status = "primary", title = "ETF Cumulative Returns", highchartOutput("returnsPlot")),
                           box(width = 6, status = "primary", title = "Return and Volatility Plot", highchartOutput("portPlot"))
                           ),
                         fluidRow(
@@ -68,40 +70,78 @@ ui <- dashboardPage(title = "ETF Single Index Model",
 server <- function(input, output) {
   
   # reactive ETF returns table
-  etfReturns <- eventReactive(input$do, {
+  etfData <- eventReactive(input$do, {
     withProgress(message = "Downloading returns data...", value = 0, {
-    returns <- getReturns2(ticker = c("^AXJO", sort(input$etfs)), freq = input$frequency,
-               start = input$dateRange[1], end = input$dateRange[2])
-    return(returns$R)
+    # returns <- getReturns2(ticker = c("^AXJO", sort(input$etfs)), freq = input$frequency,
+    #												 start = input$dateRange[1], end = input$dateRange[2])
+    returns <- c("^AXJO", sort(input$etfs)) %>%
+      tq_get(get  = "stock.prices",
+             from = as.Date(input$dateRange[1]),
+             to   = as.Date(input$dateRange[2])) %>%
+      group_by(symbol) %>% 
+      tq_transmute(select     = adjusted, 
+                   mutate_fun = periodReturn, 
+                   period     = input$frequency, 
+                   col_rename = "R") %>% 
+      mutate(ReturnsCumulative = cumsum(R))
+    
+    returns$symbol <- sub("[[:punct:]]AXJO", "ASX200 Index", returns$symbol)
+    
+    return(returns)
     })
   })
  
   # cumulative returns chart
-  output$returnsPlot <- renderPlot({
-    chart.CumReturns(etfReturns(), main = "Cumulative returns including ASX200 index", legend.loc = "topleft")
+  output$returnsPlot <- renderHighchart({
+    # color palette vector
+    colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38")
+    # Cumulative Returns highcharter
+    returnsPlot <- hchart(etfData(), "line", hcaes(x = date, y = (ReturnsCumulative * 100), group = symbol),
+                           color = colorPal[1:length(unique(etfData()$symbol))]) %>%
+                      hc_yAxis(title = list(text = "Cumulative Returns"),
+                               labels = list(format = "{value}%")) %>% 
+                      hc_tooltip(pointFormat = "{point.y}%", valueDecimals = 2) %>%
+                      hc_exporting(enabled = TRUE, filename = "cumulative_returns")
+    
+    return(returnsPlot)
   })
   
   # run SIM where index is ASX200
   sim <- eventReactive(input$do, {
     withProgress(message = "Running SIM model...", value = 0, {
-    riskFree <- ifelse(input$frequency == "week", input$riskFree/52, input$riskFree/250) 
-    sim <- stockModel(etfReturns(), Rf = riskFree, shortSelling = "no", model = "SIM", index = 1, freq = input$frequency)
+    
+    riskFree <- ifelse(input$frequency == "week", input$riskFree/52, input$riskFree/250)
+    
+    returnsModel <- etfData() %>% 
+    	select(-ReturnsCumulative) %>% 
+    	spread(., symbol, R) %>% 
+    	select(-date) %>% 
+    	as.matrix()
+    
+    sim <- stockModel(na.omit(returnsModel), Rf = riskFree, shortSelling = "no", model = "SIM", index = 1, freq = "week")
     optSim <- optimalPort(sim)
+    return(optSim)
     })
   })
   
   # Returns and risk plot
   output$portPlot <- renderHighchart({
-    optSim <- sim()
-    etfData <- t(cbind.data.frame(rbind(round(mean.geometric(etfReturns()), 5), 
-                                        round(StdDev(etfReturns()), 5)),
-                                        "Optimal Portfolio" = rbind(round(optSim$R, 5), round(optSim$risk, 5))))
-    etfData <- cbind.data.frame(Name = row.names(etfData), etfData * 100)
-    names(etfData) <- c("Name","Expected Returns","StdDev")
-    return(hchart(etfData, "scatter", hcaes(x = StdDev, y = `Expected Returns`, group = Name, size = 1)) %>%
-             hc_yAxis(labels = list(format = "{value}%")) %>%
-             hc_xAxis(labels = list(format = "{value}%")) %>%
-             hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%")
+  	# Risk Return table
+  	risk_return <- etfData() %>% 
+  		group_by(symbol) %>% 
+  		summarise(MeanReturns = mean.geometric(R),
+  							Sd = StdDev(R)) %>% 
+  		select(symbol, MeanReturns, Sd) %>% 
+  		rbind.data.frame(cbind.data.frame(symbol = "SIM Portfolio", 
+  																			MeanReturns = as.numeric(sim()$R), 
+  																			Sd = as.numeric(sim()$risk)))
+  	# Scatter Plot pf Risk and Returns
+    return(hchart(risk_return, "scatter",
+    							hcaes(x = round((Sd * 100), 3), y = round((MeanReturns * 100), 3), group = symbol, size = 1)) %>%
+    			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Mean Returns")) %>%
+    			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Std Dev")) %>%
+    			 	hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%") %>% 
+    			 	hc_exporting(enabled = TRUE, filename = "risk_return")
           )
   })
   
