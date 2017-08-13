@@ -25,3 +25,4 @@ vignettes/*.pdf
 *.knit.md
 .Rproj.user
 ETF-SIM.Rproj
+add_ETF.R
