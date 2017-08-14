@@ -11,9 +11,6 @@ options(scipen=999)  # turn off scientific notation
 load("data/etf_data.rda", envir = .GlobalEnv)
 # load("data/nasdaq_data.rda", envir = .GlobalEnv) do not load NASDAQ stocks
 
-### Load getReturns function ###
-# and use it instead of stockPortfolio::getReturns
-source("functions/getReturns.R")
 
 #### UI ####
 ui <- dashboardPage(title = "ETF Single Index Model",
@@ -94,7 +91,7 @@ server <- function(input, output) {
   # cumulative returns chart
   output$returnsPlot <- renderHighchart({
     # color palette vector
-    colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38")
+    colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38", "#17BECF", "#BCBD22")
     # Cumulative Returns highcharter
     returnsPlot <- hchart(etfData(), "line", hcaes(x = date, y = (ReturnsCumulative * 100), group = symbol),
                            color = colorPal[1:length(unique(etfData()$symbol))]) %>%
@@ -134,12 +131,18 @@ server <- function(input, output) {
   		select(symbol, MeanReturns, Sd) %>% 
   		rbind.data.frame(cbind.data.frame(symbol = "SIM Portfolio", 
   																			MeanReturns = as.numeric(sim()$R), 
-  																			Sd = as.numeric(sim()$risk)))
+  																			Sd = as.numeric(sim()$risk))) %>% 
+  		mutate(symbol = ordered(symbol, symbol))
+  	
+  	# color palette vector
+  	colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38", "#17BECF", "#BCBD22")
+  	
   	# Scatter Plot pf Risk and Returns
     return(hchart(risk_return, "scatter",
-    							hcaes(x = round((Sd * 100), 3), y = round((MeanReturns * 100), 3), group = symbol, size = 1)) %>%
-    			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Mean Returns")) %>%
-    			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Std Dev")) %>%
+    							hcaes(x = round((Sd * 100), 3), y = round((MeanReturns * 100), 3), group = symbol, size = 1),
+    							color = colorPal[1:nrow(risk_return)]) %>%
+    			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Expected Returns")) %>%
+    			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Volatility")) %>%
     			 	hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%") %>% 
     			 	hc_exporting(enabled = TRUE, filename = "risk_return")
           )
@@ -147,12 +150,16 @@ server <- function(input, output) {
   
   # Optimal portfolio weights pie chart
   output$pie <- renderHighchart({
+  	# color palette vector
+  	colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38", "#17BECF", "#BCBD22")
+  	# SIM portfolio weights
     optSim <- sim()
     portfolioWeights <- data.frame(optSim$X)
     return(highchart() %>%
               hc_add_series_labels_values(row.names(portfolioWeights), (portfolioWeights$optSim.X * 100),
                                           type = "pie", size = 230,
-                                          dataLabels = list(enabled = TRUE)) %>% 
+                                          dataLabels = list(enabled = TRUE),
+              														colorPal[2:(nrow(portfolioWeights)+1)]) %>% 
               hc_legend(enabled = TRUE) %>% 
               hc_tooltip(valueDecimals = 2, pointFormat = "<b>{point.y}%</b>")
     )
