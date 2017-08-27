@@ -54,7 +54,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                           ),
                         fluidRow(
                           box(width = 6, status = "primary", title = "Optimal Portfolio Allocation", DT::dataTableOutput("table"), height = 420),
-                          box(width = 6, status = "primary", title = "Optimal Portfolio Weights", highchartOutput("pie"), height = 420)
+                          box(width = 6, status = "primary", title = "Optimal Portfolio Growth", highchartOutput("portfolioGrowth"), height = 420)
                           )
                       ),
                       tabItem("etfList", DT::dataTableOutput("etfTable"))
@@ -69,8 +69,6 @@ server <- function(input, output) {
   # reactive ETF returns table
   etfData <- eventReactive(input$do, {
     withProgress(message = "Downloading returns data...", value = 0, {
-    # returns <- getReturns2(ticker = c("^AXJO", sort(input$etfs)), freq = input$frequency,
-    #												 start = input$dateRange[1], end = input$dateRange[2])
     returns <- c("^AXJO", sort(input$etfs)) %>%
       tq_get(get  = "stock.prices",
              from = as.Date(input$dateRange[1]),
@@ -83,6 +81,7 @@ server <- function(input, output) {
       mutate(ReturnsCumulative = cumsum(R))
     
     returns$symbol <- sub("[[:punct:]]AXJO", "ASX200 Index", returns$symbol)
+    returns$symbol <- ordered(returns$symbol, c("ASX200 Index", sort(input$etfs)))
     
     return(returns)
     })
@@ -91,7 +90,7 @@ server <- function(input, output) {
   # cumulative returns chart
   output$returnsPlot <- renderHighchart({
     # color palette vector
-    colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38", "#17BECF", "#BCBD22")
+  	colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD", "#8C564B", "#E377C2", "#17BECF")
     # Cumulative Returns highcharter
     returnsPlot <- hchart(etfData(), "line", hcaes(x = date, y = (ReturnsCumulative * 100), group = symbol),
                            color = colorPal[1:length(unique(etfData()$symbol))]) %>%
@@ -143,26 +142,29 @@ server <- function(input, output) {
     							color = colorPal[1:nrow(risk_return)]) %>%
     			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Expected Returns")) %>%
     			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Volatility")) %>%
-    			 	hc_tooltip(pointFormat = "Volatility: {point.x}% <br> Expected Return: {point.y}%") %>% 
+    			 	hc_tooltip(pointFormat = "Volatility: {point.y}% <br> Expected Return: {point.x}%") %>% 
     			 	hc_exporting(enabled = TRUE, filename = "risk_return")
           )
   })
   
-  # Optimal portfolio weights pie chart
-  output$pie <- renderHighchart({
-  	# color palette vector
-  	colorPal <- c("#000000", "#1F77B4", "#FF7F0E", "#2CA02C", "#C21A01", "#9D2053", "#774F38", "#17BECF", "#BCBD22")
-  	# SIM portfolio weights
-    optSim <- sim()
-    portfolioWeights <- data.frame(optSim$X)
-    return(highchart() %>%
-              hc_add_series_labels_values(row.names(portfolioWeights), (portfolioWeights$optSim.X * 100),
-                                          type = "pie", size = 230,
-                                          dataLabels = list(enabled = TRUE),
-              														colorPal[2:(nrow(portfolioWeights)+1)]) %>% 
-              hc_legend(enabled = TRUE) %>% 
-              hc_tooltip(valueDecimals = 2, pointFormat = "<b>{point.y}%</b>")
-    )
+
+  # Portfolio growth line chart
+  output$portfolioGrowth <- renderHighchart({
+  	# Color palette
+  	colorPal <- c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD", "#8C564B", "#E377C2", "#17BECF")
+  	# Portfolio growth chart
+  	etfData() %>%
+  		tq_portfolio(assets_col   = symbol, 
+  								 returns_col  = R, 
+  							   weights      = c(0, sim()$X), 
+  							   col_rename   = "investment_growth",
+  							   wealth.index = TRUE) %>%
+  		mutate(investment_growth = investment_growth * portfolioValue()) %>% 
+  		hchart(., "line", hcaes(x = date, y = investment_growth), color = colorPal[length(input$etfs) + 1]) %>%
+  		hc_yAxis(title = list(text = "Investment Growth"),
+  						 labels = list(format = "${value}")) %>% 
+  		hc_tooltip(pointFormat = "${point.y}", valueDecimals = 2) %>%
+  		hc_exporting(enabled = TRUE, filename = "Investment_Growth") 
   })
   
   # Optimal Portfolio Allocation table
