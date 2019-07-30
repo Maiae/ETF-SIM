@@ -20,7 +20,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                      sidebarMenu(
                                        menuItem(h4("Dashboard"), tabName = "dashboard"),
                                        selectizeInput("etfs", label = "Select ETFs",
-                                                   choices = unique(etfList$ASX_CODE),
+                                                   choices = unique(c(etfList$ASX_CODE, 'THC.AX', 'CAN.AX')),
                                                    						multiple = TRUE,
                                                    options = list(maxItems = 6,
                                                                   placeholder = 'Select up to 6 Securities')),
@@ -34,7 +34,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                                     choices = list("Daily" = "daily",
                                                                    "Weekly" = "weekly"), selected = "weekly"),
                                        numericInput("riskFree", "Risk free rate (Australia Bond 10-Year Yield rate)",
-                                                    0.0283, min = 0.0100, max = 0.1000),
+                                                    0.0178, min = 0.0100, max = 0.1000),
                                        numericInput("portfolioValue", "Enter Portfolio Value ($)",
                                                     10000, min = 1000, max = 1000000),
                                        tags$div(HTML("<center>"), actionButton("do", "Run Model")),
@@ -78,7 +78,7 @@ server <- function(input, output) {
                    mutate_fun = periodReturn, 
                    period     = input$frequency, 
                    col_rename = "R") %>% 
-      mutate(ReturnsCumulative = cumsum(R))
+      mutate(ReturnsCumulative = cumsum(replace_na(R, 0)))
     
     returns$symbol <- sub("[[:punct:]]AXJO", "ASX200 Index", returns$symbol)
     returns$symbol <- ordered(returns$symbol, c("ASX200 Index", sort(input$etfs)))
@@ -114,7 +114,12 @@ server <- function(input, output) {
     	select(-date) %>% 
     	as.matrix()
     
-    sim <- stockModel(na.omit(returnsModel), Rf = riskFree, shortSelling = "no", model = "SIM", index = 1, freq = "week")
+    sim <- stockModel(na.omit(returnsModel), 
+                      Rf = riskFree, 
+                      shortSelling = "no", 
+                      model = "SIM", 
+                      index = 1, 
+                      freq = "week")
     optSim <- optimalPort(sim)
     return(optSim)
     })
