@@ -34,7 +34,7 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                                     choices = list("Daily" = "daily",
                                                                    "Weekly" = "weekly"), selected = "weekly"),
                                        numericInput("riskFree", "Risk free rate (Australia Bond 10-Year Yield rate)",
-                                                    0.0178, min = 0.0100, max = 0.1000),
+                                                    0.0108, min = 0.0100, max = 0.1000),
                                        numericInput("portfolioValue", "Enter Portfolio Value ($)",
                                                     10000, min = 1000, max = 1000000),
                                        tags$div(HTML("<center>"), actionButton("do", "Run Model")),
@@ -113,7 +113,9 @@ server <- function(input, output) {
     	spread(., symbol, R) %>% 
     	select(-date) %>% 
     	as.matrix()
-    
+  
+    rownames(returnsModel) <- unique(as.Date(etfData()$date, "%Y-%m-%d"))
+      
     sim <- stockModel(na.omit(returnsModel), 
                       Rf = riskFree, 
                       shortSelling = "no", 
@@ -143,7 +145,7 @@ server <- function(input, output) {
   	
   	# Scatter Plot pf Risk and Returns
     return(hchart(risk_return, "scatter",
-    							hcaes(x = round((Sd * 100), 3), y = round((MeanReturns * 100), 3), group = symbol, size = 1),
+    							hcaes(x = round((Sd * 100), 3), y = round((MeanReturns * 100), 3), group = symbol),
     							color = colorPal[1:nrow(risk_return)]) %>%
     			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Expected Returns")) %>%
     			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Volatility")) %>%
