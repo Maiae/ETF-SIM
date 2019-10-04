@@ -1,5 +1,7 @@
 library(shiny)
 library(shinydashboard)
+library(dplyr)
+library(tidyr)
 library(tidyquant)
 library(stockPortfolio)
 library(PerformanceAnalytics)
@@ -20,13 +22,16 @@ ui <- dashboardPage(title = "ETF Single Index Model",
                                      sidebarMenu(
                                        menuItem(h4("Dashboard"), tabName = "dashboard"),
                                        selectizeInput("etfs", label = "Select ETFs",
-                                                   choices = unique(c(etfList$ASX_CODE, 'THC.AX', 'CAN.AX')),
+                                                   choices = unique(c(etfList$ASX_CODE, 
+                                                                      'THC.AX', 
+                                                                      'CAN.AX', 
+                                                                      'APT.AX')),
                                                    						multiple = TRUE,
                                                    options = list(maxItems = 6,
                                                                   placeholder = 'Select up to 6 Securities')),
                                        dateRangeInput('dateRange',
                                                       label = "Select date range",
-                                                      start = Sys.Date() - 1 - lubridate::years(1), 
+                                                      start = Sys.Date() - 1 - lubridate::years(2), 
                                                       end = Sys.Date() - 1,
                                                       format = "dd/mm/yyyy", weekstart = 1,
                                                       min = "2010-01-04", max = Sys.Date() - 1),
@@ -121,7 +126,7 @@ server <- function(input, output) {
                       shortSelling = "no", 
                       model = "SIM", 
                       index = 1, 
-                      freq = "week")
+                      freq = ifelse(input$frequency == "weekly", "week", "day"))
     optSim <- optimalPort(sim)
     return(optSim)
     })
@@ -149,7 +154,7 @@ server <- function(input, output) {
     							color = colorPal[1:nrow(risk_return)]) %>%
     			 	hc_yAxis(labels = list(format = "{value}%"), title = list(text = "Expected Returns")) %>%
     			 	hc_xAxis(labels = list(format = "{value}%"), title = list(text = "Volatility")) %>%
-    			 	hc_tooltip(pointFormat = "Volatility: {point.y}% <br> Expected Return: {point.x}%") %>% 
+    			 	hc_tooltip(pointFormat = "Expected Returns: {point.y}% <br> Volatility: {point.x}%") %>% 
     			 	hc_exporting(enabled = TRUE, filename = "risk_return")
           )
   })
